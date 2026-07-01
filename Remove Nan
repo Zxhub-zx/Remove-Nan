@@ -1,85 +1,94 @@
 -- โหลด UI Library (Rayfield)
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu'))()
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
+-- สร้างหน้าต่างแบบเรียบง่าย ขนาดกะทัดรัด (ปิดระบบเซฟและสิ่งรกตา)
 local Window = Rayfield:CreateWindow({
-   Name = "NaN One-Click Fixer",
-   LoadingTitle = "Initializing...",
-   LoadingSubtitle = "by AI Assistant",
+   Name = "NaN Deep Cleaner",
+   LoadingTitle = "Deep Scanning...",
+   LoadingSubtitle = "Minimal Edition",
    ConfigurationSaving = { Enabled = false }
 })
 
--- สร้างแท็บเมนู
-local MainTab = Window:CreateTab("Manual Cleaner", 4483362458)
+local MainTab = Window:CreateTab("Cleaner", 0)
 
--- ฟังก์ชันเช็คค่า NaN
-local function isNaN(value)
-    return value ~= value
+-- ฟังก์ชันเช็คค่า NaN (ตรวจสอบได้ทุก Type ทั้งตัวเลข, Vector, CFrame)
+local function isNaN(val)
+    if type(val) == "number" then
+        return val ~= val
+    elseif type(val) == "Vector3" or type(val) == "Vector2" then
+        return val.X ~= val.X or val.Y ~= val.Y or (val.X == val.X and val.Y == val.Y and type(val) == "Vector3" and val.Z ~= val.Z)
+    elseif type(val) == "CFrame" then
+        return val.X ~= val.X or val.Y ~= val.Y or val.Z ~= val.Z
+    end
+    return false
 end
 
--- ฟังก์ชันจัดการ NaN ในเกมจริง (รันครั้งเดียวตามคำสั่ง)
-local function runOnceFix(actionType)
-    local fixCount = 0
-    local logDetails = ""
-
-    -- สแกนหา NumberValue ทั่วทั้งเกม
-    for _, instance in pairs(game:GetDescendants()) do
+-- ระบบเจาะลึก: ค้นหาและเคลียร์ NaN ทุกรูปแบบใน Instance Properties
+local function deepClean(mode)
+    local cleared = 0
+    
+    -- ลุยค้นหาทุก Descendant ทั่วทั้งเกม
+    for _, obj in pairs(game:GetDescendants()) do
         pcall(function()
-            if instance:IsA("NumberValue") then
-                if isNaN(instance.Value) then
-                    fixCount = fixCount + 1
-                    logDetails = logDetails .. "- " .. instance.Name .. " (" .. instance.Parent.Name .. ")\n"
-                    
-                    if actionType == "zero" then
-                        instance.Value = 0
-                    elseif actionType == "delete" then
-                        instance:Destroy()
-                    end
+            -- 1. เจาะกลุ่ม Value Objects ทั่วไป
+            if obj:IsA("ValueBase") then
+                if isNaN(obj.Value) then
+                    cleared = cleared + 1
+                    if mode == "fix" then
+                        if obj:IsA("NumberValue") or obj:IsA("IntValue") then obj.Value = 0
+                        elseif obj:IsA("Vector3Value") then obj.Value = Vector3.new(0,0,0)
+                        elseif obj:IsA("CFrameValue") then obj.Value = CFrame.new(0,0,0) end
+                    else obj:Destroy() end
+                end
+            end
+            
+            -- 2. เจาะลึกออบเจกต์กายภาพและพิกัด (Part, Mesh, Camera) ที่มักเกิดบั๊ก NaN จนหลุดโลก
+            if obj:IsA("BasePart") or obj:IsA("Camera") then
+                if isNaN(obj.CFrame) or isNaN(obj.Position) or isNaN(obj.Size) then
+                    cleared = cleared + 1
+                    if mode == "fix" then
+                        if obj:IsA("BasePart") then
+                            obj.CFrame = CFrame.new(0, 50, 0) -- ย้ายกลับมาจุดปลอดภัย
+                            obj.Velocity = Vector3.new(0,0,0)
+                        end
+                    else obj:Destroy() end
+                end
+            end
+            
+            -- 3. เจาะระบบเอฟเฟกต์และสี (UI/Lighting) ที่คำนวณพลาดจนกลายเป็นสี NaN (จอมืด/จอกระพริบ)
+            if obj:IsA("Color3Value") or obj:IsA("Light") or obj:IsA("UIGradient") then
+                if isNaN(obj.Color) then
+                    cleared = cleared + 1
+                    if mode == "fix" then obj.Color = Color3.new(1,1,1)
+                    else obj:Destroy() end
                 end
             end
         end)
     end
-
-    return fixCount, logDetails
+    return cleared
 end
 
--- UI Elements
-local StatusLabel = MainTab:CreateLabel("สถานะ: พร้อมใช้งาน (กดเพื่อเริ่มทำงานครั้งเดียว)")
-local LogLabel = MainTab:CreateLabel("ประวัติ: ยังไม่มีการรันระบบ")
+-- หน้าจอแสดงผลแบบมินิมอล
+local InfoLabel = MainTab:CreateLabel("ระบบพร้อมเจาะลึกและทำความสะอาดครั้งเดียว")
 
 MainTab:CreateButton({
-   Name = "🔄 สแกนและเปลี่ยน NaN เป็น 0 (ครั้งเดียว)",
+   Name = "⚡ แก้ไขค่า NaN ทั้งหมดกลับเป็นปกติ",
    Callback = function()
-       StatusLabel:Set("สถานะ: กำลังสแกนและแก้ไข...")
-       task.wait(0.1) -- ให้เวลาระบบเคลียร์ UI แป๊บหนึ่งก่อนเริ่มงานหนัก
-       
-       local count, logs = runOnceFix("zero")
-       
-       StatusLabel:Set("สถานะ: เสร็จสิ้น! แก้ไขไป " .. tostring(count) .. " จุด")
-       if count > 0 then
-           LogLabel:Set("พบและแก้ไขที่:\n" .. logs)
-       else
-           LogLabel:Set("ประวัติ: ไม่พบค่า NaN ใดๆ ในเกม")
-       end
-       
-       Rayfield:Notify({Name = "สำเร็จ", Content = "เปลี่ยน NaN เป็น 0 จำนวน " .. count .. " จุด", Duration = 4})
+       InfoLabel:Set("กำลังวิเคราะห์และซ่อมแซมระบบลึก...")
+       task.wait(0.05)
+       local total = deepClean("fix")
+       InfoLabel:Set("ซ่อมแซมเสร็จสิ้น! แก้ไขไปทั้งหมด: " .. tostring(total) .. " จุด")
+       Rayfield:Notify({Name = "Deep Cleaned", Content = "ซ่อมแซมค่า NaN แล้ว " .. total .. " จุด", Duration = 3})
    end,
 })
 
 MainTab:CreateButton({
-   Name = "❌ สแกนและลบ Object ที่เป็น NaN ทิ้ง (ครั้งเดียว)",
+   Name = "🗑️ ลบออบเจกต์ที่ติดค่า NaN ทิ้งทั้งหมด",
    Callback = function()
-       StatusLabel:Set("สถานะ: กำลังสแกนและลบ...")
-       task.wait(0.1)
-       
-       local count, logs = runOnceFix("delete")
-       
-       StatusLabel:Set("สถานะ: เสร็จสิ้น! ลบไป " .. tostring(count) .. " จุด")
-       if count > 0 then
-           LogLabel:Set("ลบ Object ออกจาก:\n" .. logs)
-       else
-           LogLabel:Set("ประวัติ: ไม่พบค่า NaN ใดๆ ในเกม")
-       end
-       
-       Rayfield:Notify({Name = "สำเร็จ", Content = "ลบ Object ที่มีค่า NaN ออก " .. count .. " จุด", Duration = 4})
+       InfoLabel:Set("กำลังค้นหาและกวาดล้างออบเจกต์บั๊ก...")
+       task.wait(0.05)
+       local total = deepClean("delete")
+       InfoLabel:Set("ล้างระบบเสร็จสิ้น! ลบออบเจกต์ไป: " .. tostring(total) .. " ชิ้น")
+       Rayfield:Notify({Name = "System Purged", Content = "ทำลายออบเจกต์บั๊กทิ้ง " .. total .. " ชิ้น", Duration = 3})
    end,
 })
