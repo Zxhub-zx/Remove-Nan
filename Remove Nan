@@ -1,200 +1,85 @@
--- รันสคริปต์นี้ใน Executor ของคุณได้เลย (เช่น Synapse, Wave, Solara, Celery)
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+-- โหลด UI Library (Rayfield)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu'))()
 
--- ===== ตั้งค่าตรงนี้ให้ตรงกับเกมคุณ =====
-local MONEY_KEY_IN_LEADERSTATS = "Cash"
-local DEFAULT_RESET_VALUE = 0
--- ==========================================
+local Window = Rayfield:CreateWindow({
+   Name = "NaN One-Click Fixer",
+   LoadingTitle = "Initializing...",
+   LoadingSubtitle = "by AI Assistant",
+   ConfigurationSaving = { Enabled = false }
+})
 
--- ---------- Utility ----------
-local function isNaN(v)
-    return type(v) == "number" and v ~= v
+-- สร้างแท็บเมนู
+local MainTab = Window:CreateTab("Manual Cleaner", 4483362458)
+
+-- ฟังก์ชันเช็คค่า NaN
+local function isNaN(value)
+    return value ~= value
 end
 
-local function isValidMoney(v)
-    if type(v) ~= "number" then return false end
-    if isNaN(v) then return false end
-    if v == math.huge or v == -math.huge then return false end
-    return true
-end
+-- ฟังก์ชันจัดการ NaN ในเกมจริง (รันครั้งเดียวตามคำสั่ง)
+local function runOnceFix(actionType)
+    local fixCount = 0
+    local logDetails = ""
 
--- ---------- Logic: แก้ไขผู้เล่นที่ออนไลน์ ----------
-local function fixOnlinePlayer(targetPlayer)
-    local ls = targetPlayer:FindFirstChild("leaderstats")
-    local moneyVal = ls and ls:FindFirstChild(MONEY_KEY_IN_LEADERSTATS)
-    if not moneyVal then
-        return false, "ไม่พบค่าเงินของผู้เล่นนี้"
-    end
-    if isValidMoney(moneyVal.Value) then
-        return false, "ค่าเงินปกติอยู่แล้ว"
-    end
-    
-    -- ข้อจำกัดของ Executor: ถ้าเกมไม่มี Remote ในการแก้เงิน จะเปลี่ยนได้แค่ฝั่งเรา (Client) เท่านั้น
-    pcall(function()
-        moneyVal.Value = DEFAULT_RESET_VALUE
-    end)
-    return true, ("แก้ไข %s สำเร็จ (Local)"):format(targetPlayer.Name)
-end
-
--- ---------- สร้าง GUI สำหรับคุณคนเดียว ----------
-local function buildGui()
-    -- ลบ GUI เก่าออกก่อนถ้ามีเพื่อป้องกันการรันซ้ำซ้อน
-    local oldGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("NaNFixerGui")
-    if oldGui then oldGui:Destroy() end
-
-    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "NaNFixerGui"
-    screenGui.ResetOnSpawn = false
-    screenGui.Parent = playerGui
-
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 420, 0, 400)
-    mainFrame.Position = UDim2.new(0.5, -210, 0.5, -200)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-    mainFrame.BorderSizePixel = 0
-    mainFrame.Active = true
-    mainFrame.Draggable = true -- เพิ่มฟีเจอร์ลากหน้าต่างได้สำหรับหน้าจอคนรันสคริปต์
-    mainFrame.Parent = screenGui
-    Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
-
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    title.BorderSizePixel = 0
-    title.Text = "🛠️ NaN Money Fixer (Client Executor)"
-    title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 16
-    title.Parent = mainFrame
-    Instance.new("UICorner", title).CornerRadius = UDim.new(0, 10)
-
-    local scanButton = Instance.new("TextButton")
-    scanButton.Size = UDim2.new(1, -20, 0, 35)
-    scanButton.Position = UDim2.new(0, 10, 0, 50)
-    scanButton.BackgroundColor3 = Color3.fromRGB(50, 120, 220)
-    scanButton.Text = "🔍 สแกนผู้เล่นทุกคนในเซิร์ฟเวอร์"
-    scanButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    scanButton.Font = Enum.Font.GothamBold
-    scanButton.TextSize = 14
-    scanButton.Parent = mainFrame
-    Instance.new("UICorner", scanButton).CornerRadius = UDim.new(0, 6)
-
-    local fixAllButton = Instance.new("TextButton")
-    fixAllButton.Size = UDim2.new(1, -20, 0, 35)
-    fixAllButton.Position = UDim2.new(0, 10, 0, 90)
-    fixAllButton.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-    fixAllButton.Text = "🔧 แก้ไขทั้งหมดที่ผิดปกติ"
-    fixAllButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    fixAllButton.Font = Enum.Font.GothamBold
-    fixAllButton.TextSize = 14
-    fixAllButton.Parent = mainFrame
-    Instance.new("UICorner", fixAllButton).CornerRadius = UDim.new(0, 6)
-
-    local scrollFrame = Instance.new("ScrollingFrame")
-    scrollFrame.Size = UDim2.new(1, -20, 0, 200)
-    scrollFrame.Position = UDim2.new(0, 10, 0, 135)
-    scrollFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    scrollFrame.BorderSizePixel = 0
-    scrollFrame.ScrollBarThickness = 6
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    scrollFrame.Parent = mainFrame
-    Instance.new("UICorner", scrollFrame).CornerRadius = UDim.new(0, 6)
-
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    listLayout.Padding = UDim.new(0, 4)
-    listLayout.Parent = scrollFrame
-
-    local statusLabel = Instance.new("TextLabel")
-    statusLabel.Size = UDim2.new(1, -20, 0, 40)
-    statusLabel.Position = UDim2.new(0, 10, 0, 345)
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.Text = "พร้อมใช้งาน — กด 'สแกน' เพื่อเริ่มต้น"
-    statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-    statusLabel.Font = Enum.Font.Gotham
-    statusLabel.TextSize = 12
-    statusLabel.TextWrapped = true
-    statusLabel.Parent = mainFrame
-
-    local function clearList()
-        for _, child in ipairs(scrollFrame:GetChildren()) do
-            if child:IsA("Frame") then
-                child:Destroy()
-            end
-        end
-    end
-
-    local function scanAndDisplay()
-        clearList()
-        local corruptedCount = 0
-        for _, plr in ipairs(Players:GetPlayers()) do
-            local ls = plr:FindFirstChild("leaderstats")
-            local moneyVal = ls and ls:FindFirstChild(MONEY_KEY_IN_LEADERSTATS)
-            if moneyVal then
-                local corrupted = not isValidMoney(moneyVal.Value)
-                if corrupted then corruptedCount += 1 end
-                
-                -- สร้างแถวแสดงรายชื่อผู้เล่น
-                local row = Instance.new("Frame")
-                row.Size = UDim2.new(1, -8, 0, 40)
-                row.BackgroundColor3 = corrupted and Color3.fromRGB(90, 30, 30) or Color3.fromRGB(35, 45, 35)
-                row.BorderSizePixel = 0
-                row.Parent = scrollFrame
-                Instance.new("UICorner", row).CornerRadius = UDim.new(0, 5)
-
-                local label = Instance.new("TextLabel")
-                label.Size = UDim2.new(1, corrupted and -80 or -10, 1, 0)
-                label.Position = UDim2.new(0, 8, 0, 0)
-                label.BackgroundTransparency = 1
-                label.Text = ("%s | เงิน: %s %s"):format(plr.Name, tostring(moneyVal.Value), corrupted and "⚠️ ผิดปกติ" or "✅ ปกติ")
-                label.TextColor3 = Color3.fromRGB(255, 255, 255)
-                label.Font = Enum.Font.Gotham
-                label.TextSize = 13
-                label.TextXAlignment = Enum.TextXAlignment.Left
-                label.TextTruncate = Enum.TextTruncate.AtEnd
-                label.Parent = row
-
-                if corrupted then
-                    local fixBtn = Instance.new("TextButton")
-                    fixBtn.Size = UDim2.new(0, 65, 0, 28)
-                    fixBtn.Position = UDim2.new(1, -73, 0.5, -14)
-                    fixBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 60)
-                    fixBtn.Text = "แก้ไข"
-                    fixBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-                    fixBtn.Font = Enum.Font.GothamBold
-                    fixBtn.TextSize = 12
-                    fixBtn.Parent = row
-                    Instance.new("UICorner", fixBtn).CornerRadius = UDim.new(0, 5)
-
-                    fixBtn.MouseButton1Click:Connect(function()
-                        local ok, msg = fixOnlinePlayer(plr)
-                        statusLabel.Text = msg
-                        task.wait(0.2)
-                        scanAndDisplay() -- รีเฟรชหน้ารายการใหม่หลังจากกดแก้
-                    end)
+    -- สแกนหา NumberValue ทั่วทั้งเกม
+    for _, instance in pairs(game:GetDescendants()) do
+        pcall(function()
+            if instance:IsA("NumberValue") then
+                if isNaN(instance.Value) then
+                    fixCount = fixCount + 1
+                    logDetails = logDetails .. "- " .. instance.Name .. " (" .. instance.Parent.Name .. ")\n"
+                    
+                    if actionType == "zero" then
+                        instance.Value = 0
+                    elseif actionType == "delete" then
+                        instance:Destroy()
+                    end
                 end
             end
-        end
-        statusLabel.Text = ("สแกนเสร็จสิ้น พบ %d รายการที่ผิดปกติ"):format(corruptedCount)
+        end)
     end
 
-    scanButton.MouseButton1Click:Connect(scanAndDisplay)
-
-    fixAllButton.MouseButton1Click:Connect(function()
-        local fixedCount = 0
-        for _, plr in ipairs(Players:GetPlayers()) do
-            local ok = fixOnlinePlayer(plr)
-            if ok then fixedCount += 1 end
-        end
-        statusLabel.Text = ("แก้ไขฝั่ง Client ไปทั้งหมด %d คน"):format(fixedCount)
-        task.wait(0.2)
-        scanAndDisplay()
-    end)
+    return fixCount, logDetails
 end
 
--- รันฟังก์ชันสร้าง GUI ทันทีที่กดรันผ่าน Executor
-buildGui()
-print("[NaNFixer Executor] หน้าต่าง GUI พร้อมใช้งานแล้ว!")
+-- UI Elements
+local StatusLabel = MainTab:CreateLabel("สถานะ: พร้อมใช้งาน (กดเพื่อเริ่มทำงานครั้งเดียว)")
+local LogLabel = MainTab:CreateLabel("ประวัติ: ยังไม่มีการรันระบบ")
+
+MainTab:CreateButton({
+   Name = "🔄 สแกนและเปลี่ยน NaN เป็น 0 (ครั้งเดียว)",
+   Callback = function()
+       StatusLabel:Set("สถานะ: กำลังสแกนและแก้ไข...")
+       task.wait(0.1) -- ให้เวลาระบบเคลียร์ UI แป๊บหนึ่งก่อนเริ่มงานหนัก
+       
+       local count, logs = runOnceFix("zero")
+       
+       StatusLabel:Set("สถานะ: เสร็จสิ้น! แก้ไขไป " .. tostring(count) .. " จุด")
+       if count > 0 then
+           LogLabel:Set("พบและแก้ไขที่:\n" .. logs)
+       else
+           LogLabel:Set("ประวัติ: ไม่พบค่า NaN ใดๆ ในเกม")
+       end
+       
+       Rayfield:Notify({Name = "สำเร็จ", Content = "เปลี่ยน NaN เป็น 0 จำนวน " .. count .. " จุด", Duration = 4})
+   end,
+})
+
+MainTab:CreateButton({
+   Name = "❌ สแกนและลบ Object ที่เป็น NaN ทิ้ง (ครั้งเดียว)",
+   Callback = function()
+       StatusLabel:Set("สถานะ: กำลังสแกนและลบ...")
+       task.wait(0.1)
+       
+       local count, logs = runOnceFix("delete")
+       
+       StatusLabel:Set("สถานะ: เสร็จสิ้น! ลบไป " .. tostring(count) .. " จุด")
+       if count > 0 then
+           LogLabel:Set("ลบ Object ออกจาก:\n" .. logs)
+       else
+           LogLabel:Set("ประวัติ: ไม่พบค่า NaN ใดๆ ในเกม")
+       end
+       
+       Rayfield:Notify({Name = "สำเร็จ", Content = "ลบ Object ที่มีค่า NaN ออก " .. count .. " จุด", Duration = 4})
+   end,
+})
