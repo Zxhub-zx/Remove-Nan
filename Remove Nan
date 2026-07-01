@@ -1,71 +1,68 @@
--- โหลด UI Library (Rayfield)
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+-- [[ CONFIGURATION ]] --
+local NOTIFY_TITLE = "NaN Purge Success"
+local NOTIFY_TEXT = "🔥 ล้างคำสาป NaN แบบถอนรากถอนโคนสำเร็จแล้ว!"
 
--- สร้าง UI หน้าต่างเล็ก กะทัดรัด เรียบง่ายสุดๆ (Minimal Dark)
-local Window = Rayfield:CreateWindow({
-   Name = "NaN Anti-Virus",
-   LoadingTitle = "Securing Engine...",
-   LoadingSubtitle = "Minimalist",
-   ConfigurationSaving = { Enabled = false }
-})
-
-local MainTab = Window:CreateTab("Shield", 0)
-
--- ฟังก์ชันเช็คค่า NaN ในระบบระดับลึก
+-- 1. ฟังก์ชันเช็คขยะระดับฮาร์ดแวร์
 local function isNaN(val)
     if type(val) == "number" then return val ~= val end
     if type(val) == "Vector3" or type(val) == "Vector2" then return val.X ~= val.X end
     return false
 end
 
--- ระบบฮาร์ดคอร์เจาะบล็อกข้อมูล (Metamethod Hook)
-local function activateUltimateShield()
-    -- สเต็ปที่ 1: สแกนกวาดล้างค่าที่ค้างอยู่ในเครื่อง ณ ปัจจุบันให้เป็น 0 ก่อน
+-- 2. ระบบดักจับกลางอากาศขั้นโหด (Metamethod Overrider)
+local oldNewIndex
+oldNewIndex = hookmetamethod(game, "__newindex", function(self, property, value)
+    if property == "Value" then
+        if isNaN(value) then value = 0 end
+    elseif property == "Text" then
+        local str = tostring(value):lower()
+        if string.find(str, "nan") or string.find(str, "inf") or string.find(str, "ind") then
+            value = "0"
+        end
+    elseif property == "CFrame" or property == "Position" or property == "Size" then
+        if isNaN(value) then value = self.CFrame or CFrame.new(0,50,0) end
+    elseif property == "Velocity" or property == "AssemblyLinearVelocity" then
+        if isNaN(value) then value = Vector3.new(0,0,0) end
+    end
+    return oldNewIndex(self, property, value)
+end)
+
+-- 3. มหกรรมกวาดล้างไฟล์และออบเจกต์ที่ติดบั๊ก ณ ปัจจุบัน
+task.spawn(function()
     for _, obj in pairs(game:GetDescendants()) do
         pcall(function()
+            -- ซ่อมแซมตระกูลค่าสถานะ/เงิน/คะแนน ทั้งหมด
             if obj:IsA("ValueBase") then
                 if isNaN(obj.Value) then
                     obj.Value = 0
-                elseif obj:IsA("StringValue") and string.find(string.lower(obj.Value), "nan") then
+                elseif obj:IsA("StringValue") and string.find(obj.Value:lower(), "nan") then
                     obj.Value = "0"
+                end
+            end
+            -- บดขยี้ตัวหนังสือคำว่า NaN บนหน้าจอ UI ทุกชิ้นในเกม
+            if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+                local txt = obj.Text:lower()
+                if string.find(txt, "nan") or string.find(txt, "inf") or string.find(txt, "ind") then
+                    obj.Text = "0"
+                end
+            end
+            -- แก้ไขพิกัดตัวละคร/พาร์ทปลิว
+            if obj:IsA("BasePart") then
+                if isNaN(obj.CFrame) or isNaN(obj.Position) or isNaN(obj.Velocity) then
+                    obj.Velocity = Vector3.new(0, 0, 0)
+                    obj.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                 end
             end
         end)
     end
+end)
 
-    -- สเต็ปที่ 2: ฝังระบบ "ดักฟังและเปลี่ยนค่ากลางอากาศ" (Metamethod Hooking)
-    -- วิธีนี้จะดักจับทุกครั้งที่ระบบเกมพยายามจะเขียนค่า (__newindex) ลงในออบเจกต์ 
-    -- ถ้าข้อมูลที่เกมจะเปลี่ยนส่งมาเป็น NaN ระบบจะสกัดกั้นและบังคับให้มันกลายเป็น 0 ทันที
-    local oldNewIndex
-    oldNewIndex = hookmetamethod(game, "__newindex", function(self, property, value)
-        -- ตรวจสอบว่าระบบพยายามจะใส่ค่า NaN หรือ ตัวหนังสือคำว่า "NaN" หรือไม่
-        if property == "Value" or property == "Text" then
-            if isNaN(value) then
-                value = 0 -- ถ้าเป็นตัวเลข NaN บังคับเป็น 0 ทันที
-            elseif type(value) == "string" and string.find(string.lower(value), "nan") then
-                value = "0" -- ถ้าเป็นข้อความ NaN บังคับเป็นตัวอักษร "0"
-            end
-        end
-        return oldNewIndex(self, property, value)
-    end)
-end
-
--- UI Elements แบบเรียบง่ายที่สุดตามสั่ง
-local StatusText = MainTab:CreateLabel("สถานะ: ระบบเกราะยังไม่ได้เปิดใช้งาน")
-
-MainTab:CreateButton({
-   Name = "🛡️ เปิดระบบบล็อก NaN ระดับรากแก้ว (กดครั้งเดียว)",
-   Callback = function()
-       StatusText:Set("สถานะ: กำลังสับสวิตช์บล็อกเน็ตเวิร์ก...")
-       task.wait(0.05)
-       
-       pcall(activateUltimateShield)
-       
-       StatusText:Set("สถานะ: เกราะดักจับและบล็อก NaN ทำงานถาวรแล้ว!")
-       Rayfield:Notify({
-           Name = "System Overridden", 
-           Content = "บล็อกการส่งค่า NaN จากเซิร์ฟเวอร์แบบถาวรแล้วในเซิฟนี้", 
-           Duration = 4
-       })
-   end,
-})
+-- 4. แสดงข้อความตัวหนังสือแจ้งเตือนระบบทำงานสำเร็จ (ไม่มีหน้าต่าง UI โผล่มา)
+pcall(function()
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = NOTIFY_TITLE,
+        Text = NOTIFY_TEXT,
+        Duration = 6,
+        Icon = "rbxassetid://4483362458"
+    })
+end)
