@@ -1,17 +1,16 @@
 -- โหลด UI Library (Rayfield)
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu'))()
 
--- สร้างหน้าต่างแบบเรียบง่าย ขนาดกะทัดรัด (ปิดระบบเซฟและสิ่งรกตา)
 local Window = Rayfield:CreateWindow({
-   Name = "NaN Deep Cleaner",
-   LoadingTitle = "Deep Scanning...",
-   LoadingSubtitle = "Minimal Edition",
+   Name = "Universal NaN Shield",
+   LoadingTitle = "Securing Game Environment...",
+   LoadingSubtitle = "Minimal Dark Edition",
    ConfigurationSaving = { Enabled = false }
 })
 
-local MainTab = Window:CreateTab("Cleaner", 0)
+local MainTab = Window:CreateTab("Shield Menu", 0)
 
--- ฟังก์ชันเช็คค่า NaN (ตรวจสอบได้ทุก Type ทั้งตัวเลข, Vector, CFrame)
+-- ฟังก์ชันเช็คค่า NaN ครอบคลุมทุก Type (Number, Vector, CFrame)
 local function isNaN(val)
     if type(val) == "number" then
         return val ~= val
@@ -23,72 +22,75 @@ local function isNaN(val)
     return false
 end
 
--- ระบบเจาะลึก: ค้นหาและเคลียร์ NaN ทุกรูปแบบใน Instance Properties
-local function deepClean(mode)
-    local cleared = 0
+-- ระบบสแกนลึกและฝังเกราะดักจับถาวร
+local function applyUniversalShield()
+    local securedCount = 0
     
-    -- ลุยค้นหาทุก Descendant ทั่วทั้งเกม
     for _, obj in pairs(game:GetDescendants()) do
         pcall(function()
-            -- 1. เจาะกลุ่ม Value Objects ทั่วไป
+            -- 1. เคลียร์และล็อกกลุ่ม Value Objects ทั้งหมด (เงิน, ค่าสถานะ, เลเวล, ข้อมูลผู้เล่น)
             if obj:IsA("ValueBase") then
                 if isNaN(obj.Value) then
-                    cleared = cleared + 1
-                    if mode == "fix" then
-                        if obj:IsA("NumberValue") or obj:IsA("IntValue") then obj.Value = 0
-                        elseif obj:IsA("Vector3Value") then obj.Value = Vector3.new(0,0,0)
-                        elseif obj:IsA("CFrameValue") then obj.Value = CFrame.new(0,0,0) end
-                    else obj:Destroy() end
-                end
-            end
-            
-            -- 2. เจาะลึกออบเจกต์กายภาพและพิกัด (Part, Mesh, Camera) ที่มักเกิดบั๊ก NaN จนหลุดโลก
-            if obj:IsA("BasePart") or obj:IsA("Camera") then
-                if isNaN(obj.CFrame) or isNaN(obj.Position) or isNaN(obj.Size) then
-                    cleared = cleared + 1
-                    if mode == "fix" then
-                        if obj:IsA("BasePart") then
-                            obj.CFrame = CFrame.new(0, 50, 0) -- ย้ายกลับมาจุดปลอดภัย
-                            obj.Velocity = Vector3.new(0,0,0)
+                    if obj:IsA("NumberValue") or obj:IsA("IntValue") then obj.Value = 0
+                    elseif obj:IsA("Vector3Value") then obj.Value = Vector3.new(0,0,0)
+                    elseif obj:IsA("CFrameValue") then obj.Value = CFrame.new(0,0,0) end
+                    securedCount = securedCount + 1
+                    
+                    -- ดักจับการเปลี่ยนแปลง: ถ้าเซิร์ฟเวอร์ส่ง NaN มาอีก ให้ดีดกลับเป็นค่าปกติทันที
+                    obj.Changed:Connect(function(newValue)
+                        if isNaN(newValue) then
+                            if obj:IsA("NumberValue") or obj:IsA("IntValue") then obj.Value = 0
+                            elseif obj:IsA("Vector3Value") then obj.Value = Vector3.new(0,0,0)
+                            elseif obj:IsA("CFrameValue") then obj.Value = CFrame.new(0,0,0) end
                         end
-                    else obj:Destroy() end
+                    end)
+                -- กรณีระบบเกมแปลงข้อมูลเป็นตัวหนังสือคำว่า "NaN" บนหน้าจอหรือกระดาน
+                elseif obj:IsA("StringValue") and string.find(string.lower(obj.Value), "nan") then
+                    obj.Value = "0"
+                    securedCount = securedCount + 1
+                    
+                    obj.Changed:Connect(function(newValue)
+                        if string.find(string.lower(newValue), "nan") then
+                            obj.Value = "0"
+                        end
+                    end)
                 end
             end
             
-            -- 3. เจาะระบบเอฟเฟกต์และสี (UI/Lighting) ที่คำนวณพลาดจนกลายเป็นสี NaN (จอมืด/จอกระพริบ)
-            if obj:IsA("Color3Value") or obj:IsA("Light") or obj:IsA("UIGradient") then
-                if isNaN(obj.Color) then
-                    cleared = cleared + 1
-                    if mode == "fix" then obj.Color = Color3.new(1,1,1)
-                    else obj:Destroy() end
+            -- 2. เคลียร์และล็อกค่าออบเจกต์ทางกายภาพ (โมเดล, กล้อง, ส่วนประกอบที่อาจปลิวเพราะพิกัดพัง)
+            if obj:IsA("BasePart") then
+                if isNaN(obj.CFrame) or isNaN(obj.Position) or isNaN(obj.Velocity) then
+                    obj.Velocity = Vector3.new(0,0,0)
+                    obj.RotVelocity = Vector3.new(0,0,0)
+                    securedCount = securedCount + 1
+                    
+                    -- ดักจับกรณีที่แรงเฉื่อยหรือพิกัดโดนแฮกเกอร์ยิงค่า NaN ใส่
+                    obj:GetPropertyChangedSignal("Velocity"):Connect(function()
+                        if isNaN(obj.Velocity) then obj.Velocity = Vector3.new(0,0,0) end
+                    end)
                 end
             end
         end)
     end
-    return cleared
+    return securedCount
 end
 
--- หน้าจอแสดงผลแบบมินิมอล
-local InfoLabel = MainTab:CreateLabel("ระบบพร้อมเจาะลึกและทำความสะอาดครั้งเดียว")
+-- UI หน้าต่างควบคุมแบบเรียบง่ายที่สุด
+local DisplayText = MainTab:CreateLabel("สถานะ: รอรันระบบล็อกค่าป้องกันเซิร์ฟเวอร์ป่วน")
 
 MainTab:CreateButton({
-   Name = "⚡ แก้ไขค่า NaN ทั้งหมดกลับเป็นปกติ",
+   Name = "🛡️ ล้างบั๊กและเปิดเกราะป้องกัน NaN ทุกอย่างในเกม",
    Callback = function()
-       InfoLabel:Set("กำลังวิเคราะห์และซ่อมแซมระบบลึก...")
+       DisplayText:Set("กำลังกวาดล้างและวางระบบเกราะดักจับ...")
        task.wait(0.05)
-       local total = deepClean("fix")
-       InfoLabel:Set("ซ่อมแซมเสร็จสิ้น! แก้ไขไปทั้งหมด: " .. tostring(total) .. " จุด")
-       Rayfield:Notify({Name = "Deep Cleaned", Content = "ซ่อมแซมค่า NaN แล้ว " .. total .. " จุด", Duration = 3})
-   end,
-})
-
-MainTab:CreateButton({
-   Name = "🗑️ ลบออบเจกต์ที่ติดค่า NaN ทิ้งทั้งหมด",
-   Callback = function()
-       InfoLabel:Set("กำลังค้นหาและกวาดล้างออบเจกต์บั๊ก...")
-       task.wait(0.05)
-       local total = deepClean("delete")
-       InfoLabel:Set("ล้างระบบเสร็จสิ้น! ลบออบเจกต์ไป: " .. tostring(total) .. " ชิ้น")
-       Rayfield:Notify({Name = "System Purged", Content = "ทำลายออบเจกต์บั๊กทิ้ง " .. total .. " ชิ้น", Duration = 3})
+       
+       local total = applyUniversalShield()
+       
+       DisplayText:Set("สำเร็จ! บล็อกและล็อกค่าป้องกันไป " .. tostring(total) .. " จุดทั่วเกม")
+       Rayfield:Notify({
+           Name = "Universal Shield Active", 
+           Content = "ปกป้องค่าทุกอย่างในเครื่องจากการโจมตีด้วย NaN แล้ว!", 
+           Duration = 5
+       })
    end,
 })
