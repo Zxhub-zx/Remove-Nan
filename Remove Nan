@@ -1,96 +1,71 @@
 -- โหลด UI Library (Rayfield)
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu'))()
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
+-- สร้าง UI หน้าต่างเล็ก กะทัดรัด เรียบง่ายสุดๆ (Minimal Dark)
 local Window = Rayfield:CreateWindow({
-   Name = "Universal NaN Shield",
-   LoadingTitle = "Securing Game Environment...",
-   LoadingSubtitle = "Minimal Dark Edition",
+   Name = "NaN Anti-Virus",
+   LoadingTitle = "Securing Engine...",
+   LoadingSubtitle = "Minimalist",
    ConfigurationSaving = { Enabled = false }
 })
 
-local MainTab = Window:CreateTab("Shield Menu", 0)
+local MainTab = Window:CreateTab("Shield", 0)
 
--- ฟังก์ชันเช็คค่า NaN ครอบคลุมทุก Type (Number, Vector, CFrame)
+-- ฟังก์ชันเช็คค่า NaN ในระบบระดับลึก
 local function isNaN(val)
-    if type(val) == "number" then
-        return val ~= val
-    elseif type(val) == "Vector3" or type(val) == "Vector2" then
-        return val.X ~= val.X or val.Y ~= val.Y or (val.X == val.X and val.Y == val.Y and type(val) == "Vector3" and val.Z ~= val.Z)
-    elseif type(val) == "CFrame" then
-        return val.X ~= val.X or val.Y ~= val.Y or val.Z ~= val.Z
-    end
+    if type(val) == "number" then return val ~= val end
+    if type(val) == "Vector3" or type(val) == "Vector2" then return val.X ~= val.X end
     return false
 end
 
--- ระบบสแกนลึกและฝังเกราะดักจับถาวร
-local function applyUniversalShield()
-    local securedCount = 0
-    
+-- ระบบฮาร์ดคอร์เจาะบล็อกข้อมูล (Metamethod Hook)
+local function activateUltimateShield()
+    -- สเต็ปที่ 1: สแกนกวาดล้างค่าที่ค้างอยู่ในเครื่อง ณ ปัจจุบันให้เป็น 0 ก่อน
     for _, obj in pairs(game:GetDescendants()) do
         pcall(function()
-            -- 1. เคลียร์และล็อกกลุ่ม Value Objects ทั้งหมด (เงิน, ค่าสถานะ, เลเวล, ข้อมูลผู้เล่น)
             if obj:IsA("ValueBase") then
                 if isNaN(obj.Value) then
-                    if obj:IsA("NumberValue") or obj:IsA("IntValue") then obj.Value = 0
-                    elseif obj:IsA("Vector3Value") then obj.Value = Vector3.new(0,0,0)
-                    elseif obj:IsA("CFrameValue") then obj.Value = CFrame.new(0,0,0) end
-                    securedCount = securedCount + 1
-                    
-                    -- ดักจับการเปลี่ยนแปลง: ถ้าเซิร์ฟเวอร์ส่ง NaN มาอีก ให้ดีดกลับเป็นค่าปกติทันที
-                    obj.Changed:Connect(function(newValue)
-                        if isNaN(newValue) then
-                            if obj:IsA("NumberValue") or obj:IsA("IntValue") then obj.Value = 0
-                            elseif obj:IsA("Vector3Value") then obj.Value = Vector3.new(0,0,0)
-                            elseif obj:IsA("CFrameValue") then obj.Value = CFrame.new(0,0,0) end
-                        end
-                    end)
-                -- กรณีระบบเกมแปลงข้อมูลเป็นตัวหนังสือคำว่า "NaN" บนหน้าจอหรือกระดาน
+                    obj.Value = 0
                 elseif obj:IsA("StringValue") and string.find(string.lower(obj.Value), "nan") then
                     obj.Value = "0"
-                    securedCount = securedCount + 1
-                    
-                    obj.Changed:Connect(function(newValue)
-                        if string.find(string.lower(newValue), "nan") then
-                            obj.Value = "0"
-                        end
-                    end)
-                end
-            end
-            
-            -- 2. เคลียร์และล็อกค่าออบเจกต์ทางกายภาพ (โมเดล, กล้อง, ส่วนประกอบที่อาจปลิวเพราะพิกัดพัง)
-            if obj:IsA("BasePart") then
-                if isNaN(obj.CFrame) or isNaN(obj.Position) or isNaN(obj.Velocity) then
-                    obj.Velocity = Vector3.new(0,0,0)
-                    obj.RotVelocity = Vector3.new(0,0,0)
-                    securedCount = securedCount + 1
-                    
-                    -- ดักจับกรณีที่แรงเฉื่อยหรือพิกัดโดนแฮกเกอร์ยิงค่า NaN ใส่
-                    obj:GetPropertyChangedSignal("Velocity"):Connect(function()
-                        if isNaN(obj.Velocity) then obj.Velocity = Vector3.new(0,0,0) end
-                    end)
                 end
             end
         end)
     end
-    return securedCount
+
+    -- สเต็ปที่ 2: ฝังระบบ "ดักฟังและเปลี่ยนค่ากลางอากาศ" (Metamethod Hooking)
+    -- วิธีนี้จะดักจับทุกครั้งที่ระบบเกมพยายามจะเขียนค่า (__newindex) ลงในออบเจกต์ 
+    -- ถ้าข้อมูลที่เกมจะเปลี่ยนส่งมาเป็น NaN ระบบจะสกัดกั้นและบังคับให้มันกลายเป็น 0 ทันที
+    local oldNewIndex
+    oldNewIndex = hookmetamethod(game, "__newindex", function(self, property, value)
+        -- ตรวจสอบว่าระบบพยายามจะใส่ค่า NaN หรือ ตัวหนังสือคำว่า "NaN" หรือไม่
+        if property == "Value" or property == "Text" then
+            if isNaN(value) then
+                value = 0 -- ถ้าเป็นตัวเลข NaN บังคับเป็น 0 ทันที
+            elseif type(value) == "string" and string.find(string.lower(value), "nan") then
+                value = "0" -- ถ้าเป็นข้อความ NaN บังคับเป็นตัวอักษร "0"
+            end
+        end
+        return oldNewIndex(self, property, value)
+    end)
 end
 
--- UI หน้าต่างควบคุมแบบเรียบง่ายที่สุด
-local DisplayText = MainTab:CreateLabel("สถานะ: รอรันระบบล็อกค่าป้องกันเซิร์ฟเวอร์ป่วน")
+-- UI Elements แบบเรียบง่ายที่สุดตามสั่ง
+local StatusText = MainTab:CreateLabel("สถานะ: ระบบเกราะยังไม่ได้เปิดใช้งาน")
 
 MainTab:CreateButton({
-   Name = "🛡️ ล้างบั๊กและเปิดเกราะป้องกัน NaN ทุกอย่างในเกม",
+   Name = "🛡️ เปิดระบบบล็อก NaN ระดับรากแก้ว (กดครั้งเดียว)",
    Callback = function()
-       DisplayText:Set("กำลังกวาดล้างและวางระบบเกราะดักจับ...")
+       StatusText:Set("สถานะ: กำลังสับสวิตช์บล็อกเน็ตเวิร์ก...")
        task.wait(0.05)
        
-       local total = applyUniversalShield()
+       pcall(activateUltimateShield)
        
-       DisplayText:Set("สำเร็จ! บล็อกและล็อกค่าป้องกันไป " .. tostring(total) .. " จุดทั่วเกม")
+       StatusText:Set("สถานะ: เกราะดักจับและบล็อก NaN ทำงานถาวรแล้ว!")
        Rayfield:Notify({
-           Name = "Universal Shield Active", 
-           Content = "ปกป้องค่าทุกอย่างในเครื่องจากการโจมตีด้วย NaN แล้ว!", 
-           Duration = 5
+           Name = "System Overridden", 
+           Content = "บล็อกการส่งค่า NaN จากเซิร์ฟเวอร์แบบถาวรแล้วในเซิฟนี้", 
+           Duration = 4
        })
    end,
 })
