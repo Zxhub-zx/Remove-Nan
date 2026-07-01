@@ -1,68 +1,158 @@
--- [[ CONFIGURATION ]] --
-local NOTIFY_TITLE = "NaN Purge Success"
-local NOTIFY_TEXT = "🔥 ล้างคำสาป NaN แบบถอนรากถอนโคนสำเร็จแล้ว!"
+-- =============================================================================
+-- [MODULE 1: INITIALIZATION & ENVIRONMENT SETUP]
+-- ประกาศตัวแปรแวดล้อมพื้นฐานและดึงบริการหลักของเอนจิ้นเกมมาใช้งานอย่างละเอียด
+-- =============================================================================
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local StarterGui = game:GetService("StarterGui")
+local UserInputService = game:GetService("UserInputService")
 
--- 1. ฟังก์ชันเช็คขยะระดับฮาร์ดแวร์
-local function isNaN(val)
-    if type(val) == "number" then return val ~= val end
-    if type(val) == "Vector3" or type(val) == "Vector2" then return val.X ~= val.X end
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- ตรวจสอบความเข้ากันได้ของ Executor ระดับสูง
+assert(hookmetamethod, "Executor ของคุณไม่รองรับฟังก์ชัน hookmetamethod (กรุณาใช้ Executor ตัวอื่น)")
+
+-- =============================================================================
+-- [MODULE 2: CORE MATHEMATICAL VALIDATION]
+-- ฟังก์ชันคัดกรองขยะระดับคณิตศาสตร์และโครงสร้างพิกัด เพื่อหาค่าพัง (NaN / INF)
+-- =============================================================================
+local function isValueCorrupted(val)
+    -- ตรวจสอบตัวเลขทั่วไป (NaN จะไม่เท่ากับตัวมันเอง)
+    if type(val) == "number" then
+        return val ~= val
+    end
+    -- ตรวจสอบโครงสร้างพิกัด 3 มิติ (Vector3)
+    if type(val) == "Vector3" then
+        return val.X ~= val.X or val.Y ~= val.Y or val.Z ~= val.Z
+    end
+    -- ตรวจสอบโครงสร้างพิกัด 2 มิติ (Vector2)
+    if type(val) == "Vector2" then
+        return val.X ~= val.X or val.Y ~= val.Y
+    end
+    -- ตรวจสอบโครงสร้างพิกัดองศาและทิศทาง (CFrame)
+    if type(val) == "CFrame" then
+        local x, y, z = val.X, val.Y, val.Z
+        return x ~= x or y ~= y or z ~= z
+    end
+    -- ตรวจสอบตัวหนังสือที่ระบุข้อความ Error ขยะค้างระบบ
+    if type(val) == "string" then
+        local s = string.lower(val)
+        return string.find(s, "nan") or string.find(s, "inf") or string.find(s, "ind")
+    end
     return false
 end
 
--- 2. ระบบดักจับกลางอากาศขั้นโหด (Metamethod Overrider)
+-- =============================================================================
+-- [MODULE 3: DEEP NETWORK & PROPERTY OVERRIDE]
+-- การทำ Metamethod Hooking เพื่อบล็อกข้อมูลพังๆ จากเซิร์ฟเวอร์กลางอากาศ
+-- =============================================================================
 local oldNewIndex
 oldNewIndex = hookmetamethod(game, "__newindex", function(self, property, value)
+    -- ดักจับการแก้ไขค่าในตระกูล Value ทั้งหมด (ค่าเงิน, เลเวล, ค่าสถานะ)
     if property == "Value" then
-        if isNaN(value) then value = 0 end
+        if isValueCorrupted(value) then
+            if self:IsA("NumberValue") or self:IsA("IntValue") then
+                value = 0
+            elseif self:IsA("StringValue") then
+                value = "0"
+            elseif self:IsA("Vector3Value") then
+                value = Vector3.new(0, 0, 0)
+            elseif self:IsA("CFrameValue") then
+                value = CFrame.new(0, 0, 0)
+            end
+        end
+    -- ดักจับการพ่นข้อความลงบน UI หน้าจอทั้งหมด
     elseif property == "Text" then
-        local str = tostring(value):lower()
-        if string.find(str, "nan") or string.find(str, "inf") or string.find(str, "ind") then
+        if isValueCorrupted(value) then
             value = "0"
         end
-    elseif property == "CFrame" or property == "Position" or property == "Size" then
-        if isNaN(value) then value = self.CFrame or CFrame.new(0,50,0) end
-    elseif property == "Velocity" or property == "AssemblyLinearVelocity" then
-        if isNaN(value) then value = Vector3.new(0,0,0) end
+    -- ดักจับระบบฟิสิกส์ แรงเฉื่อย และพิกัดตำแหน่ง (ป้องกันตัวละครหรือฉากปลิวหายไปใน Void)
+    elseif property == "CFrame" or property == "Position" then
+        if isValueCorrupted(value) then
+            value = CFrame.new(0, 50, 0) -- บังคับย้ายวัตถุมาพิกัดปลอดภัยกลางแผนที่แทน
+        end
+    elseif property == "Velocity" or property == "AssemblyLinearVelocity" or property == "RotVelocity" then
+        if isValueCorrupted(value) then
+            value = Vector3.new(0, 0, 0) -- หยุดแรงเฉื่อยขยะที่ทำให้เกม Crash
+        end
     end
+    
     return oldNewIndex(self, property, value)
 end)
 
--- 3. มหกรรมกวาดล้างไฟล์และออบเจกต์ที่ติดบั๊ก ณ ปัจจุบัน
-task.spawn(function()
-    for _, obj in pairs(game:GetDescendants()) do
+-- =============================================================================
+-- [MODULE 4: SYSTEM PURGE & MEMORY SANITIZATION]
+-- ฟังก์ชันกวาดล้างออบเจกต์ในระบบเกมทั้งหมด ไล่สแกนทีละชิ้นแบบถอนรากถอนโคน
+-- =============================================================================
+local function executeSystemPurge()
+    local purgeCounter = 0
+    
+    -- ใช้ GetDescendants ค้นหาทุกองค์ประกอบที่โหลดอยู่ในหน่วยความจำขณะนี้
+    local gameElements = game:GetDescendants()
+    
+    for i = 1, #gameElements do
+        local obj = gameElements[i]
+        
         pcall(function()
-            -- ซ่อมแซมตระกูลค่าสถานะ/เงิน/คะแนน ทั้งหมด
+            -- 1. ซ่อมแซมระบบดาต้าเบสชั่วคราวในเครื่อง (Value Objects)
             if obj:IsA("ValueBase") then
-                if isNaN(obj.Value) then
-                    obj.Value = 0
-                elseif obj:IsA("StringValue") and string.find(obj.Value:lower(), "nan") then
-                    obj.Value = "0"
+                if isValueCorrupted(obj.Value) then
+                    purgeCounter = purgeCounter + 1
+                    if obj:IsA("NumberValue") or obj:IsA("IntValue") then
+                        obj.Value = 0
+                    elseif obj:IsA("StringValue") then
+                        obj.Value = "0"
+                    end
                 end
             end
-            -- บดขยี้ตัวหนังสือคำว่า NaN บนหน้าจอ UI ทุกชิ้นในเกม
+            
+            -- 2. ซ่อมแซมทุกตัวอักษรบนหน้าจอ (UI Elements)
             if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
-                local txt = obj.Text:lower()
-                if string.find(txt, "nan") or string.find(txt, "inf") or string.find(txt, "ind") then
+                if isValueCorrupted(obj.Text) then
+                    purgeCounter = purgeCounter + 1
                     obj.Text = "0"
                 end
             end
-            -- แก้ไขพิกัดตัวละคร/พาร์ทปลิว
-            if obj:IsA("BasePart") then
-                if isNaN(obj.CFrame) or isNaN(obj.Position) or isNaN(obj.Velocity) then
-                    obj.Velocity = Vector3.new(0, 0, 0)
-                    obj.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            
+            -- 3. ซ่อมแซมระบบกายภาพ ตัวละคร พาร์ทแผนที่ และกล้องผู้เล่น
+            if obj:IsA("BasePart") or obj:IsA("Camera") then
+                if isValueCorrupted(obj.CFrame) or isValueCorrupted(obj.Position) then
+                    purgeCounter = purgeCounter + 1
+                    if obj:IsA("BasePart") then
+                        obj.Velocity = Vector3.new(0, 0, 0)
+                        obj.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                        obj.RotVelocity = Vector3.new(0, 0, 0)
+                    end
                 end
             end
         end)
     end
-end)
+    
+    return purgeCounter
+end
 
--- 4. แสดงข้อความตัวหนังสือแจ้งเตือนระบบทำงานสำเร็จ (ไม่มีหน้าต่าง UI โผล่มา)
-pcall(function()
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = NOTIFY_TITLE,
-        Text = NOTIFY_TEXT,
-        Duration = 6,
-        Icon = "rbxassetid://4483362458"
-    })
-end)
+-- =============================================================================
+-- [MODULE 5: EXECUTION & NOTIFICATION]
+-- ส่วนควบคุมการรันระบบ และสั่งแสดงตัวหนังสือแจ้งเตือนเมื่อทำเสร็จสิ้น
+-- =============================================================================
+local function main()
+    -- บังคับเคลียร์ขยะในทันที
+    local totalPurged = executeSystemPurge()
+    
+    -- ส่งคำสั่งผ่านระบบดั้งเดิมของ Roblox เพื่อเด้งตัวหนังสือแจ้งเตือนที่มุมขวาล่าง
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = "🔥 Purge Completed",
+            Text = "ล้างข้อมูลขยะเสร็จสิ้น ทำลายคำสาป NaN ไปทั้งหมด " .. tostring(totalPurged) .. " จุด!",
+            Duration = 7,
+            Icon = "rbxassetid://4483362458"
+        })
+    end)
+end
+
+-- เริ่มการทำงานของสคริปต์ทั้งหมดทันทีแบบไร้ UI รบกวน
+main()
